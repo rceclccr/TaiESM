@@ -1,0 +1,14 @@
+! Users should add all user specific namelist changes below in the form of 
+! namelist_var = new_namelist_value 
+!------------------------------------------------------------------------
+! The namelist settings for TaiESM are
+!  deep_scheme = 'ZMMOD'
+!  macrop_scheme = 'tpdf'
+!
+! Other options include
+!  deep_scheme = 'SAS'
+!  eddy_scheme = 'HBGFS'
+!  shallow_scheme = 'HP'
+!  macrop_scheme = 'updf'
+!------------------------------------------------------------------------
+ 

@@ -1,0 +1,110 @@
+#! /bin/csh -f
+
+set mach = nuwa
+
+#################################################################################
+if ($PHASE == set_batch) then
+#################################################################################
+
+source ./Tools/ccsm_getenv || exit -1
+
+set ntasks  = `${CASEROOT}/Tools/taskmaker.pl -sumonly`
+set maxthrds = `${CASEROOT}/Tools/taskmaker.pl -maxthrds`
+@ nodes = $ntasks / ${MAX_TASKS_PER_NODE}
+if ( $ntasks % ${MAX_TASKS_PER_NODE} > 0) then
+  @ nodes = $nodes + 1
+  @ ntasks = $nodes * ${MAX_TASKS_PER_NODE}
+endif
+@ taskpernode = ${MAX_TASKS_PER_NODE} / ${maxthrds}
+set qname = route
+set tlimit = "24:00:00"
+
+#--- Job name is first fifteen characters of case name ---
+#set jobname = `echo ${CASE} | cut -c1-25`
+set jobname = `echo ${CASE}`
+
+cat >! $CASEROOT/${CASE}.run << EOF1
+#!/bin/csh -f
+#===============================================================================
+# GENERIC_USER
+# This is where the batch submission is set.  The above code computes
+# the total number of tasks, nodes, and other things that can be useful
+# here.  Use PBS, BSUB, or whatever the local environment supports.
+#===============================================================================
+
+#PBS -N ${jobname}
+##PBS -q ${qname}
+#PBS -l nodes=${nodes}:ppn=${taskpernode}
+#PBS -l walltime=${tlimit}
+#PBS -o nuwahn:\${PBS_O_WORKDIR}/outfile
+#PBS -e nuwahn:\${PBS_O_WORKDIR}/errfile
+#PBS -m abe
+##PBS -M changlab@gmail.com
+#PBS -r n
+##PBS -j oe
+#PBS -S /bin/csh -V
+
+#limit coredumpsize 1000000
+#limit stacksize unlimited
+
+
+EOF1
+
+#################################################################################
+else if ($PHASE == set_exe) then
+#################################################################################
+
+set maxthrds = `${CASEROOT}/Tools/taskmaker.pl -maxthrds`
+set maxtasks = `${CASEROOT}/Tools/taskmaker.pl -sumtasks`
+
+cat >> ${CASEROOT}/${CASE}.run << EOF1
+# -------------------------------------------------------------------------
+# Run the model
+# -------------------------------------------------------------------------
+source $MODULESHOME/init/csh
+module purge
+module load intel/comp-12.1
+module load mvapich2-1.9/intel-12.1
+module load netcdf-4.1.3/intel-12.1
+module load cmake/2.8.12.2_intel-12.1
+module list
+#sleep 25
+cd \$RUNDIR
+echo "\`date\` -- CSM EXECUTION BEGINS HERE" 
+
+#===============================================================================
+# GENERIC_USER
+# Launch the job here.  Some samples are commented out below
+#===============================================================================
+
+setenv OMP_NUM_THREADS ${maxthrds}
+#mpiexec -n ${maxtasks} ./ccsm.exe >&! ccsm.log.\$LID
+#mpirun -np ${maxtasks} ./ccsm.exe >&! ccsm.log.\$LID
+mpiexec -rmk pbs -np ${maxtasks} \$EXEROOT/cesm.exe >&! cesm.log.\$LID
+
+wait
+echo "\`date\` -- CSM EXECUTION HAS FINISHED" 
+
+EOF1
+
+
+#################################################################################
+else if ($PHASE == set_larch) then
+#################################################################################
+
+
+   #This is a place holder for a long-term archiving script
+
+
+#################################################################################
+else
+#################################################################################
+
+    echo "mkscripts.$mach"
+    echo "  PHASE setting of $PHASE is not an accepted value"
+    echo "  accepted values are set_batch, set_exe and set_larch"
+    exit 1
+
+#################################################################################
+endif
+#################################################################################

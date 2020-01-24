@@ -1,0 +1,146 @@
+#! /bin/csh -f
+
+#################################################################################
+if ($PHASE == set_batch) then
+#################################################################################
+
+source ./Tools/ccsm_getenv || exit -1
+
+set ntasks  = `${CASEROOT}/Tools/taskmaker.pl -sumonly`
+set maxthrds = `${CASEROOT}/Tools/taskmaker.pl -maxthrds`
+@ nodes = $ntasks / ${MAX_TASKS_PER_NODE}
+if ( $ntasks % ${MAX_TASKS_PER_NODE} > 0) then
+  @ nodes = $nodes + 1
+  @ ntasks = $nodes * ${MAX_TASKS_PER_NODE}
+endif
+@ taskpernode = ${MAX_TASKS_PER_NODE} / ${maxthrds}
+set qname = batch
+set tlimit = "24:00:00"
+
+#--- Job name is first fifteen characters of case name ---
+#set jobname = `echo ${CASE} | cut -c1-15` # first fifteen characters of case name
+set jobname = `echo ${CASE}` # first fifteen characters of case name
+
+if ($?TESTMODE) then
+ set file = $CASEROOT/${CASE}.test
+else
+ set file = $CASEROOT/${CASE}.run
+endif
+
+cat >! $file << EOF1
+#!/bin/csh -f
+#===============================================================================
+#  This is a CCSM batch job script 
+#===============================================================================
+#PBS -N ${jobname}
+##PBS -q ${qname}
+#PBS -l nodes=${nodes}:ppn=${taskpernode}
+#PBS -l walltime=${tlimit}
+#PBS -o scud:\${RUNDIR}/outfile
+#PBS -e scud:\${RUNDIR}/errfile
+#PBS -m abe
+##PBS -M gdhwang@gate.sinica.edu.tw
+#PBS -r n
+#PBS -S /bin/csh -V
+
+source \$MODULESHOME/init/csh
+module purge
+EOF1
+
+if ( $COMPILER == "intel" ) then
+  echo "module load intel/comp-13.1 intel/mkl-11.1" >> $file
+  echo "module load hdf5-1.8.12/intel-13.1" >> $file
+  echo "module load netcdf-4.1.3/hdf5_intel-13.1" >> $file
+  if ( "$MPILIB" == "mpich" ) then
+    echo "module load mvapich2-2.2/intel-13.1" >> $file
+    echo "module load pnetcdf-1.4.1/mvapich2-1.9_intel-13.1" >> $file
+  endif
+  if ( "$MPILIB" == "openmpi" ) then
+    echo "module load openmpi-1.6.5/intel-13.1" >> $file
+    echo "module load pnetcdf-1.4.1/openmpi-1.6.5_intel-13.1" >> $file
+  endif
+endif
+
+if ( $COMPILER == "pgi" ) then
+  echo "module load pgi/pgwc-9.0.4" >> $file
+  echo "module load hdf5-1.8.13/pgi-9.0.4" >> $file
+  echo "module load netcdf-4.1.3/hdf5_pgi-9.0.4" >> $file
+  if ( "$MPILIB" == "mpich" ) then
+    echo "module load mvapich2-1.9/pgi-9.0.4" >> $file
+    echo "module load pnetcdf-1.5.0/mvapich2-1.9_pgi-9.0.4" >> $file
+  endif
+  if ( "$MPILIB" == "openmpi" ) then
+    echo "module load openmpi-1.8.3/pgi-9.0.4" >> $file
+    echo "module load pnetcdf-1.5.0/openmpi-1.8.3_pgi-9.0.4" >> $file
+  endif
+endif
+
+if ( $COMPILER == "gnu" ) then
+  echo "module load hdf5-1.8.13/gcc-4.1.2" >> $file
+  echo "module load netcdf-4.1.3/hdf5_gcc-4.1.2" >> $file
+  if ( "$MPILIB" == "mpich" ) then
+    echo "module load mvapich2-1.9/gcc-4.1.2" >> $file
+    echo "module load pnetcdf-1.5.0/mvapich2-1.9_gcc-4.1.2" >> $file
+  endif
+  if ( "$MPILIB" == "openmpi" ) then
+    echo "module load openmpi-1.8.3/gcc-4.1.2" >> $file
+    echo "module load pnetcdf-1.5.0/openmpi-1.8.3_gcc4-4.4.7" >> $file
+  endif
+endif
+
+echo "module list" >> $file
+echo "" >> $file
+
+#################################################################################
+else if ($PHASE == set_exe) then
+#################################################################################
+source ./Tools/ccsm_getenv || exit -1
+
+set maxthrds = `${CASEROOT}/Tools/taskmaker.pl -maxthrds`
+set maxtasks = `${CASEROOT}/Tools/taskmaker.pl -sumtasks`
+
+cat >> ${CASEROOT}/${CASE}.run << EOF1
+# -------------------------------------------------------------------------
+# Run the model
+# -------------------------------------------------------------------------
+
+sleep 25
+cd \$RUNDIR
+echo "\`date\` -- CSM EXECUTION BEGINS HERE" 
+
+setenv OMP_NUM_THREADS ${maxthrds}
+#if (\$MPILIB == "mpi-serial") then
+#    \${EXEROOT}/cesm.exe >&! cesm.log.\$LID
+#else if (\$MPILIB == "openmpi") then
+#    mpiexec -bind-to-socket --mca btl openib,self -machinefile \$PBS_NODEFILE -np ${maxtasks} \${EXEROOT}/cesm.exe >&! cesm.log.\$LID
+#else if (\$MPILIB == "mpich") then
+#    mpiexec -rmk pbs -np ${maxtasks} -bind-to socket \${EXEROOT}/cesm.exe >&! cesm.log.\$LID
+#endif
+mpiexec -np ${maxtasks} \${EXEROOT}/cesm.exe >&! cesm.log.\$LID
+
+wait
+
+echo "\`date\` -- CSM EXECUTION HAS FINISHED" 
+
+EOF1
+
+
+#################################################################################
+else if ($PHASE == set_larch) then
+#################################################################################
+
+
+   #This is a place holder for a long-term archiving script
+
+
+#################################################################################
+else
+#################################################################################
+
+    echo "  PHASE setting of $PHASE is not an accepted value"
+    echo "  accepted values are set_batch, set_exe and set_larch"
+    exit 1
+
+#################################################################################
+endif
+#################################################################################
