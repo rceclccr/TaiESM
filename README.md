@@ -8,5 +8,7 @@
   
   
   Taiwan Earth System Model Version 1: Description and Evaluation of Mean State
+  
   https://www.geosci-model-dev-discuss.net/gmd-2019-377/
-  DOI: 10.5194/gmd-2019-377
+ 
+ DOI: 10.5194/gmd-2019-377
